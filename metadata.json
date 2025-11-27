@@ -1,0 +1,5 @@
+{
+  "name": "Network Iris",
+  "description": "A high-performance, biological-inspired network topology visualizer designed for rapid root-cause analysis of large-scale network infrastructure.",
+  "requestFramePermissions": []
+}
