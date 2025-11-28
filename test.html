@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Test Page</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 20px;
+        background-color: #050505;
+        color: white;
+        font-family: system-ui;
+      }
+      .container {
+        text-align: center;
+        padding: 50px;
+      }
+      h1 {
+        color: #3b82f6;
+        font-size: 48px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Test Page</h1>
+      <p>If you can see this, the web server is working.</p>
+      <p>Current time: <span id="time"></span></p>
+    </div>
+    
+    <script>
+      document.getElementById('time').textContent = new Date().toLocaleString();
+      console.log('Test page loaded successfully');
+    </script>
+  </body>
+</html>

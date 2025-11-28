@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Simple React Test</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+      body {
+        margin: 0;
+        background-color: #050505;
+        color: white;
+        font-family: system-ui;
+      }
+      .container {
+        width: 100vw;
+        height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+      }
+      h1 { color: #3b82f6; font-size: 48px; margin-bottom: 20px; }
+      button { 
+        padding: 10px 20px; 
+        margin: 10px; 
+        background: #3b82f6; 
+        color: white; 
+        border: none; 
+        border-radius: 5px; 
+        cursor: pointer;
+        font-size: 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const { useState } = React;
+
+      function SimpleApp() {
+        const [count, setCount] = useState(0);
+
+        console.log('React component rendering, count:', count);
+
+        return React.createElement('div', { className: 'container' }, [
+          React.createElement('h1', { key: 'title' }, 'Simple React Test'),
+          React.createElement('p', { key: 'count' }, `Count: ${count}`),
+          React.createElement('button', { 
+            key: 'button',
+            onClick: () => setCount(count + 1) 
+          }, 'Click me'),
+          React.createElement('p', { 
+            key: 'status',
+            style: { marginTop: '20px', color: '#666' }
+          }, 'If you see this, React is working!')
+        ]);
+      }
+
+      console.log('Creating React root...');
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      console.log('Rendering React component...');
+      root.render(React.createElement(SimpleApp));
+      console.log('React render complete');
+    </script>
+  </body>
+</html>

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Network Iris - Final Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+        .container {
+            text-align: center;
+            color: white;
+            max-width: 600px;
+            padding: 40px;
+        }
+        h1 {
+            font-size: 72px;
+            margin-bottom: 20px;
+            text-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+        .subtitle {
+            font-size: 32px;
+            margin-bottom: 30px;
+            opacity: 0.9;
+        }
+        .info {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            margin-top: 30px;
+        }
+        .time {
+            font-size: 20px;
+            margin-top: 15px;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Network Iris</h1>
+        <div class="subtitle">✅ Pure HTML Test!</div>
+        <div class="info">
+            <p>If you can see this beautiful page, the web server is working perfectly!</p>
+            <div class="time" id="time"></div>
+        </div>
+    </div>
+    
+    <script>
+        console.log('🎉 Final HTML page loaded successfully!');
+        document.getElementById('time').textContent = 'Current time: ' + new Date().toLocaleString();
+        
+        // Add some interactivity
+        document.addEventListener('click', function() {
+            document.body.style.background = 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)';
+            console.log('🎨 Background changed!');
+        });
+    </script>
+</body>
+</html>

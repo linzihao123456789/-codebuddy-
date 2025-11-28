@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Debug Page</title>
+    <script>
+        console.log('HTML script tag executed');
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded event fired');
+            document.body.innerHTML = '<h1 style="color: red; font-size: 48px; text-align: center; margin-top: 100px;">HTML is Working!</h1>';
+        });
+    </script>
+</head>
+<body>
+    <h1>Loading...</h1>
+</body>
+</html>

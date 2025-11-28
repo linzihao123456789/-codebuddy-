@@ -1,36 +1,551 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
+<head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#000000" />
     <title>Network Iris - RCA Visualization</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <style>
-      body {
-        margin: 0;
-        background-color: #050505;
-        color: #e5e5e5;
-        font-family: 'Inter', system-ui, -apple-system, sans-serif;
-        overflow: hidden; /* Prevent scroll on the full screen canvas app */
-      }
-      canvas {
-        display: block;
-      }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #050505;
+            color: #e5e5e5;
+            overflow: hidden;
+        }
+        .grid-bg {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            opacity: 0.2;
+            background-image: radial-gradient(#1e293b 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+        .sidebar {
+            position: absolute;
+            top: 0;
+            right: 0;
+            height: 100%;
+            width: 320px;
+            background: rgba(0,0,0,0.9);
+            backdrop-filter: blur(12px);
+            border-left: 1px solid rgba(255,255,255,0.1);
+            padding: 24px;
+            overflow-y: auto;
+            z-index: 20;
+        }
+        .controls {
+            position: absolute;
+            bottom: 24px;
+            left: 24px;
+            z-index: 20;
+        }
+        .scenario-btn {
+            padding: 8px 16px;
+            margin: 4px;
+            background: rgba(0,0,0,0.6);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: #9ca3af;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        .scenario-btn.active {
+            background: rgba(59, 130, 246, 0.8);
+            border-color: rgba(59, 130, 246, 0.6);
+            color: white;
+            box-shadow: 0 0 15px rgba(37, 99, 235, 0.5);
+        }
+        .scenario-btn:hover {
+            background: rgba(59, 130, 246, 0.6);
+            color: white;
+        }
+        .scenario-info {
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            max-width: 320px;
+        }
+        .node-info h3 {
+            color: #3b82f6;
+            margin-bottom: 16px;
+            font-size: 18px;
+        }
+        .node-info p {
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: #9ca3af;
+        }
+        .node-info .value {
+            color: #e5e5e5;
+            font-weight: 500;
+        }
+        .status-normal { color: #10b981; }
+        .status-warning { color: #f59e0b; }
+        .status-critical { color: #ef4444; }
+        .back-btn {
+            position: absolute;
+            top: 24px;
+            left: 24px;
+            z-index: 30;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 16px;
+            background: rgba(59, 130, 246, 0.2);
+            border: 1px solid rgba(59, 130, 246, 0.5);
+            color: #93c5fd;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        .back-btn:hover {
+            background: rgba(59, 130, 246, 0.4);
+        }
     </style>
-  <script type="importmap">
-{
-  "imports": {
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "d3": "https://aistudiocdn.com/d3@^7.9.0"
-  }
-}
-</script>
 </head>
-  <body>
+<body>
     <div id="root"></div>
-  </body>
+    
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useCallback } = React;
+
+        // Network generation logic
+        const generateNetwork = () => {
+            const nodes = new Map();
+            const centerX = window.innerWidth / 2;
+            const centerY = window.innerHeight / 2;
+            const SECTOR_COUNT = 4;
+            const AGG_PER_SECTOR = 4;
+            const TOR_PER_AGG = 24;
+            const AGG_RADIUS = 130;
+            const TOR_RADIUS_START = 260;
+            const TOR_RADIUS_WIDTH = 60;
+
+            // Core node
+            const coreNode = {
+                id: 'CORE-01',
+                type: 'CORE',
+                status: 'NORMAL',
+                parentId: null,
+                x: centerX,
+                y: centerY,
+                angle: 0,
+                radius: 0,
+                ip: '10.0.0.1',
+                traffic: 45,
+                packetLoss: 0,
+                childrenIds: [],
+                rackPosition: 'MDF-01-R01',
+                capacity: '10 Tbps'
+            };
+            nodes.set(coreNode.id, coreNode);
+
+            // Generate AGG and TOR nodes
+            let aggCounter = 0;
+            let torCounter = 0;
+
+            for (let s = 0; s < SECTOR_COUNT; s++) {
+                const sectorAngleStart = s * (Math.PI * 2 / SECTOR_COUNT);
+                const sectorSpan = (Math.PI * 2 / SECTOR_COUNT);
+                const padding = 0.15;
+                const usableSpan = sectorSpan - (padding * 2);
+
+                for (let a = 0; a < AGG_PER_SECTOR; a++) {
+                    const aggId = `AGG-${(aggCounter + 1).toString().padStart(2, '0')}`;
+                    const angleStep = usableSpan / AGG_PER_SECTOR;
+                    const angle = sectorAngleStart + padding + (angleStep * a) + (angleStep / 2);
+                    const pos = { x: AGG_RADIUS * Math.cos(angle), y: AGG_RADIUS * Math.sin(angle) };
+
+                    const aggNode = {
+                        id: aggId,
+                        type: 'AGG',
+                        status: 'NORMAL',
+                        parentId: coreNode.id,
+                        x: centerX + pos.x,
+                        y: centerY + pos.y,
+                        angle: angle,
+                        radius: AGG_RADIUS,
+                        ip: `10.1.${s + 1}.${a + 1}`,
+                        traffic: 30 + Math.random() * 20,
+                        packetLoss: 0,
+                        childrenIds: [],
+                        rackPosition: `IDF-0${s+1}-R${Math.floor(a/2)+1}`,
+                        capacity: '1 Tbps'
+                    };
+                    nodes.set(aggId, aggNode);
+                    coreNode.childrenIds.push(aggId);
+                    aggCounter++;
+
+                    // TOR nodes
+                    const torAngleSpan = angleStep * 1.2;
+                    const torStartAngle = angle - (torAngleSpan / 2);
+                    const rows = 3;
+                    const torsPerRow = TOR_PER_AGG / rows;
+
+                    for (let t = 0; t < TOR_PER_AGG; t++) {
+                        const torId = `TOR-${(torCounter + 1).toString().padStart(3, '0')}`;
+                        const row = t % rows;
+                        const col = Math.floor(t / rows);
+                        const radius = TOR_RADIUS_START + (row * (TOR_RADIUS_WIDTH / rows));
+                        const torAngleStep = torAngleSpan / torsPerRow;
+                        const torAngle = torStartAngle + (col * torAngleStep) + (torAngleStep/2);
+                        const tPos = { x: radius * Math.cos(torAngle), y: radius * Math.sin(torAngle) };
+
+                        const torNode = {
+                            id: torId,
+                            type: 'TOR',
+                            status: 'NORMAL',
+                            parentId: aggNode.id,
+                            x: centerX + tPos.x,
+                            y: centerY + tPos.y,
+                            angle: torAngle,
+                            radius: radius,
+                            ip: `10.2.${aggCounter}.${t + 1}`,
+                            traffic: 10 + Math.random() * 15,
+                            packetLoss: 0,
+                            childrenIds: [],
+                            rackPosition: `CAB-${s+1}-${Math.floor(torCounter/10)+1}-U${(t%42)+1}`,
+                            capacity: '100 Gbps'
+                        };
+                        nodes.set(torId, torNode);
+                        aggNode.childrenIds.push(torId);
+                        torCounter++;
+                    }
+                }
+            }
+
+            return nodes;
+        };
+
+        function App() {
+            const [simulationState, setSimulationState] = useState({
+                nodes: generateNetwork(),
+                selectedNodeId: null,
+                hoveredNodeId: null,
+                scenario: 'NORMAL',
+                viewMode: 'GLOBAL',
+                focusedNodeId: null
+            });
+
+            const canvasRef = useRef(null);
+            const animationRef = useRef(null);
+
+            const applyScenario = useCallback((scenario) => {
+                setSimulationState(prev => {
+                    const newNodes = new Map();
+                    prev.nodes.forEach((node, id) => {
+                        const newNode = { ...node };
+                        newNode.status = 'NORMAL';
+                        newNode.packetLoss = 0;
+                        newNode.traffic = 20 + Math.random() * 30;
+                        newNodes.set(id, newNode);
+                    });
+
+                    // Apply scenario effects
+                    if (scenario === 'TOR_FAILURE') {
+                        const torNodes = Array.from(newNodes.values()).filter(n => n.type === 'TOR');
+                        const randomTor = torNodes[Math.floor(Math.random() * torNodes.length)];
+                        if (randomTor) {
+                            randomTor.status = 'CRITICAL';
+                            randomTor.packetLoss = 100;
+                            randomTor.traffic = 0;
+                        }
+                    } else if (scenario === 'AGG_FAILURE') {
+                        const aggNodes = Array.from(newNodes.values()).filter(n => n.type === 'AGG');
+                        const targetAgg = aggNodes[1] || aggNodes[0];
+                        if (targetAgg) {
+                            targetAgg.status = 'CRITICAL';
+                            targetAgg.packetLoss = 85;
+                            newNodes.forEach(n => {
+                                if (n.parentId === targetAgg.id) {
+                                    n.status = 'WARNING';
+                                    n.packetLoss = 40 + Math.random() * 20;
+                                }
+                            });
+                        }
+                    } else if (scenario === 'CORE_FAILURE') {
+                        const core = newNodes.get('CORE-01');
+                        if (core) {
+                            core.status = 'CRITICAL';
+                            core.packetLoss = 50;
+                            newNodes.forEach(n => {
+                                if (n.type !== 'CORE') n.status = 'WARNING';
+                            });
+                        }
+                    } else if (scenario === 'HIGH_LOAD') {
+                        newNodes.forEach(n => {
+                            n.traffic = 85 + Math.random() * 15;
+                            if (n.traffic > 95) n.status = 'WARNING';
+                        });
+                    }
+
+                    return { ...prev, scenario, nodes: newNodes };
+                });
+            }, []);
+
+            const handleNodeClick = useCallback((nodeId) => {
+                const node = simulationState.nodes.get(nodeId);
+                if (node && node.type === 'AGG' && simulationState.viewMode === 'GLOBAL') {
+                    // Enter focused mode
+                    const centerX = window.innerWidth / 2;
+                    const centerY = window.innerHeight / 2;
+                    const FOCUSED_TOR_RADIUS = 250;
+                    
+                    const newNodes = new Map();
+                    
+                    // Center the AGG node
+                    const centerNode = { ...node, x: centerX, y: centerY };
+                    newNodes.set(nodeId, centerNode);
+                    
+                    // Arrange children in a circle
+                    if (node.childrenIds) {
+                        node.childrenIds.forEach((childId, idx) => {
+                            const child = simulationState.nodes.get(childId);
+                            if (child) {
+                                const angle = (idx / node.childrenIds.length) * Math.PI * 2;
+                                const x = centerX + FOCUSED_TOR_RADIUS * Math.cos(angle);
+                                const y = centerY + FOCUSED_TOR_RADIUS * Math.sin(angle);
+                                newNodes.set(childId, { ...child, x, y });
+                            }
+                        });
+                    }
+                    
+                    setSimulationState(prev => ({
+                        ...prev,
+                        nodes: newNodes,
+                        viewMode: 'FOCUSED',
+                        focusedNodeId: nodeId,
+                        selectedNodeId: nodeId
+                    }));
+                } else {
+                    setSimulationState(prev => ({ ...prev, selectedNodeId: nodeId }));
+                }
+            }, [simulationState]);
+
+            const exitFocusedMode = useCallback(() => {
+                setSimulationState(prev => ({
+                    ...prev,
+                    nodes: generateNetwork(),
+                    viewMode: 'GLOBAL',
+                    focusedNodeId: null,
+                    selectedNodeId: null
+                }));
+            }, []);
+
+            // Canvas rendering
+            useEffect(() => {
+                const canvas = canvasRef.current;
+                if (!canvas) return;
+
+                const ctx = canvas.getContext('2d');
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+
+                const render = () => {
+                    // Clear background
+                    ctx.fillStyle = '#050505';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                    // Draw links
+                    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+                    ctx.lineWidth = 1;
+                    simulationState.nodes.forEach(node => {
+                        if (node.parentId) {
+                            const parent = simulationState.nodes.get(node.parentId);
+                            if (parent) {
+                                ctx.beginPath();
+                                ctx.moveTo(parent.x, parent.y);
+                                ctx.lineTo(node.x, node.y);
+                                ctx.stroke();
+                            }
+                        }
+                    });
+
+                    // Draw nodes
+                    simulationState.nodes.forEach(node => {
+                        let color = '#10b981'; // Default green
+                        let radius = 2;
+                        let glow = false;
+
+                        if (node.type === 'CORE') {
+                            radius = 12;
+                            color = node.status === 'CRITICAL' ? '#ef4444' : '#3b82f6';
+                            glow = true;
+                        } else if (node.type === 'AGG') {
+                            radius = simulationState.viewMode === 'FOCUSED' ? 15 : 5;
+                            color = node.status === 'CRITICAL' ? '#ef4444' : '#06b6d4';
+                            glow = node.status === 'CRITICAL' || simulationState.viewMode === 'FOCUSED';
+                        } else if (node.type === 'TOR') {
+                            if (node.status === 'CRITICAL') {
+                                color = '#ef4444';
+                                radius = 4;
+                                glow = true;
+                            } else if (node.status === 'WARNING') {
+                                color = '#f59e0b';
+                            }
+                        }
+
+                        // Highlight selected/hovered
+                        if (simulationState.selectedNodeId === node.id || simulationState.hoveredNodeId === node.id) {
+                            ctx.strokeStyle = '#ffffff';
+                            ctx.lineWidth = 1.5;
+                            ctx.beginPath();
+                            ctx.arc(node.x, node.y, radius + 4, 0, Math.PI * 2);
+                            ctx.stroke();
+                        }
+
+                        // Draw node
+                        ctx.fillStyle = color;
+                        ctx.beginPath();
+                        ctx.arc(node.x, node.y, radius, 0, Math.PI * 2);
+                        if (glow) {
+                            ctx.shadowBlur = 10;
+                            ctx.shadowColor = color;
+                        }
+                        ctx.fill();
+                        ctx.shadowBlur = 0;
+                    });
+
+                    animationRef.current = requestAnimationFrame(render);
+                };
+
+                render();
+
+                return () => {
+                    if (animationRef.current) cancelAnimationFrame(animationRef.current);
+                };
+            }, [simulationState]);
+
+            const selectedNode = simulationState.nodes.get(simulationState.selectedNodeId || simulationState.hoveredNodeId);
+
+            const scenarioDescriptions = {
+                NORMAL: "Optimal network performance. Traffic flowing smoothly.",
+                TOR_FAILURE: "Single Point of Failure. Access switch unreachability detected.",
+                AGG_FAILURE: "Aggregation Failure. Downstream impact analysis active.",
+                CORE_FAILURE: "CRITICAL: Core switch instability. Network-wide outage risk.",
+                HIGH_LOAD: "Traffic Surge. Buffer capacities nearing threshold."
+            };
+
+            return (
+                <div style={{ position: 'relative', width: '100vw', height: '100vh', background: '#050505', overflow: 'hidden' }}>
+                    <div className="grid-bg" />
+                    
+                    {simulationState.viewMode === 'FOCUSED' && (
+                        <div className="back-btn" onClick={exitFocusedMode}>
+                            ← Back to Global Topology
+                        </div>
+                    )}
+
+                    <canvas 
+                        ref={canvasRef}
+                        style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            height: '100%',
+                            cursor: 'crosshair'
+                        }}
+                        onClick={(e) => {
+                            const rect = canvasRef.current.getBoundingClientRect();
+                            const x = e.clientX - rect.left;
+                            const y = e.clientY - rect.top;
+                            
+                            let closestNode = null;
+                            let closestDist = Infinity;
+                            
+                            simulationState.nodes.forEach(node => {
+                                const dist = Math.sqrt((node.x - x) ** 2 + (node.y - y) ** 2);
+                                if (dist < 20 && dist < closestDist) {
+                                    closestDist = dist;
+                                    closestNode = node.id;
+                                }
+                            });
+                            
+                            handleNodeClick(closestNode);
+                        }}
+                        onMouseMove={(e) => {
+                            const rect = canvasRef.current.getBoundingClientRect();
+                            const x = e.clientX - rect.left;
+                            const y = e.clientY - rect.top;
+                            
+                            let closestNode = null;
+                            let closestDist = Infinity;
+                            
+                            simulationState.nodes.forEach(node => {
+                                const dist = Math.sqrt((node.x - x) ** 2 + (node.y - y) ** 2);
+                                if (dist < 20 && dist < closestDist) {
+                                    closestDist = dist;
+                                    closestNode = node.id;
+                                }
+                            });
+                            
+                            setSimulationState(prev => ({ ...prev, hoveredNodeId: closestNode }));
+                        }}
+                        onMouseLeave={() => setSimulationState(prev => ({ ...prev, hoveredNodeId: null }))}
+                    />
+
+                    <div className="sidebar">
+                        <div className="node-info">
+                            <h3>🎯 Network Iris</h3>
+                            <p>Nodes: <span className="value">{simulationState.nodes.size}</span></p>
+                            <p>Scenario: <span className="value">{simulationState.scenario.replace('_', ' ')}</span></p>
+                            
+                            {selectedNode && (
+                                <>
+                                    <h3 style={{ marginTop: '24px' }}>
+                                        {selectedNode.id}
+                                    </h3>
+                                    <p>Type: <span className="value">{selectedNode.type}</span></p>
+                                    <p>Status: <span className={`value status-${selectedNode.status.toLowerCase()}`}>{selectedNode.status}</span></p>
+                                    <p>IP: <span className="value">{selectedNode.ip}</span></p>
+                                    <p>Traffic: <span className="value">{Math.round(selectedNode.traffic)}%</span></p>
+                                    <p>Packet Loss: <span className="value">{selectedNode.packetLoss}%</span></p>
+                                    <p>Capacity: <span className="value">{selectedNode.capacity}</span></p>
+                                </>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="controls">
+                        <div className="scenario-info">
+                            <h4>{simulationState.scenario.replace('_', ' ')}</h4>
+                            <p style={{ fontSize: '12px', color: '#9ca3af', marginTop: '4px' }}>
+                                {scenarioDescriptions[simulationState.scenario]}
+                            </p>
+                        </div>
+                        
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                            {['NORMAL', 'TOR_FAILURE', 'AGG_FAILURE', 'CORE_FAILURE', 'HIGH_LOAD'].map(scenario => (
+                                <button
+                                    key={scenario}
+                                    className={`scenario-btn ${simulationState.scenario === scenario ? 'active' : ''}`}
+                                    onClick={() => applyScenario(scenario)}
+                                >
+                                    {scenario.replace('_', ' ')}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
 </html>
